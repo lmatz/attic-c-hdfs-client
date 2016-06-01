@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <limits>
+#include <string.h>
 
 using namespace Hdfs::Internal;
 
@@ -690,18 +691,32 @@ TEST_F(TestCInterface, TestConcat_Success) {
     hdfsFile file = NULL;
     int err;
     const char *srcs[2];
-    file = hdfsOpenFile(fs, BASE_DIR"/testFileConcatSrc", O_WRONLY, 0, 0, 0);
+    char inputBuffer[8];
+    file = hdfsOpenFile(fs, BASE_DIR"/testFileConcatSrc",
+			O_WRONLY|O_CREAT|O_TRUNC, 0, 0, 0);
+    ASSERT_TRUE(NULL != file);
+    EXPECT_TRUE(4 == hdfsWrite(fs, file, "abcd", 4));
+    EXPECT_EQ(0, hdfsCloseFile(fs, file));
+    file = hdfsOpenFile(fs, BASE_DIR"/testFileConcatTrg",
+			O_WRONLY|O_CREAT|O_TRUNC, 0, 0, 0);
     ASSERT_TRUE(NULL != file);
     EXPECT_EQ(0, hdfsCloseFile(fs, file));
     // concatenate a file
     srcs[0] = BASE_DIR"/testFileConcatSrc";
     srcs[1] = NULL;
-    err = hdfsConcat(fs, BASE_DIR"/testFiileConcatTrg", srcs);
+    err = hdfsConcat(fs, BASE_DIR"/testFileConcatTrg", srcs);
     EXPECT_EQ(0, err);
     err = hdfsExists(fs, BASE_DIR"/testFileConcatTrg");
     EXPECT_EQ(0, err);
     err = hdfsExists(fs, BASE_DIR"/testFileConcatSrc");
     EXPECT_TRUE(0 != err);
+    file = hdfsOpenFile(fs, BASE_DIR"/testFileConcatTrg",
+			O_RDONLY, 0, 0, 0);
+    ASSERT_TRUE(NULL != file);
+    EXPECT_EQ(4, hdfsRead(fs, file, inputBuffer, 8));
+    inputBuffer[4] = '\0';
+    EXPECT_EQ(0, strcmp("abcd", inputBuffer));
+    EXPECT_EQ(0, hdfsCloseFile(fs, file));
 }
 
 TEST_F(TestCInterface, TestGetWorkingDirectory_InvalidInput) {
